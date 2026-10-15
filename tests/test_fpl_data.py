@@ -50,3 +50,23 @@ def test_live_fixtures_skip_unscheduled():
     ]
     f = fpl.parse_live_fixtures(fixtures, boot)
     assert f[["gw", "home", "away"]].values.tolist() == [[2, "Arsenal", "Man United"]]
+
+
+def test_rows_carry_stable_player_codes():
+    g = fpl.parse_player_gw(_csv("fpl_merged_gw.csv"), _csv("fpl_teams.csv"), "2024-25",
+                            codes={10: 5001, 20: 5002})
+    assert g.code.tolist() == [5001, 5002]
+
+
+def test_align_elements_rekeys_by_code_not_by_reused_ids():
+    # Element 384 is a Liverpool outfielder last season and a Man City keeper this season.
+    rows = pd.DataFrame({
+        "season": ["2025-26", "2025-26", "2026-27"],
+        "element": [384, 120, 384],
+        "code": [111, 222, 222],          # the keeper is code 222 in both seasons
+        "name": ["Outfielder", "Keeper", "Keeper"],
+    })
+    this_season = {384: 222, 501: 333}    # code 111 has left the league
+    out = fpl.align_elements(rows, this_season)
+    assert out[["season", "element", "name"]].values.tolist() == [
+        ["2025-26", 384, "Keeper"], ["2026-27", 384, "Keeper"]]

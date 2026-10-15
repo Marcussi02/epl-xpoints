@@ -28,9 +28,9 @@ SQUAD_QUOTA = {"GK": 2, "DEF": 5, "MID": 5, "FWD": 3}
 XI_LIMITS = {"GK": (1, 1), "DEF": (3, 5), "MID": (2, 5), "FWD": (1, 3)}
 MAX_PER_CLUB = 3
 HIT_COST = 4.0
-# The planner charges itself 8 per hit, not 4: chosen on the 2023-24 season replay, where
-# it cut hits from 37 to 15 and raised the season total (see REPORT.md).
-HIT_PENALTY = 8.0
+# What the planner charges itself per hit. Charging more than the real 4 (to demand a
+# margin) was tried on the 2023-24 replay and did not help once the data was right.
+HIT_PENALTY = HIT_COST
 
 
 @dataclass
