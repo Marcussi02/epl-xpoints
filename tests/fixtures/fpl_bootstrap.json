@@ -1,0 +1,11 @@
+{"teams": [{"id": 1, "name": "Arsenal"}, {"id": 14, "name": "Man Utd"}],
+ "element_types": [{"id": 1}, {"id": 2}, {"id": 3}, {"id": 4}, {"id": 5}],
+ "elements": [
+  {"id": 1, "web_name": "Raya", "team": 1, "element_type": 1, "now_cost": 55, "status": "a",
+   "chance_of_playing_next_round": null, "minutes": 900, "expected_goals": "0.00", "expected_assists": "0.10"},
+  {"id": 2, "web_name": "Saka", "team": 1, "element_type": 3, "now_cost": 101, "status": "d",
+   "chance_of_playing_next_round": 75, "minutes": 800, "expected_goals": "3.20", "expected_assists": "2.90"},
+  {"id": 3, "web_name": "Gaffer", "team": 14, "element_type": 5, "now_cost": 8, "status": "a",
+   "chance_of_playing_next_round": null, "minutes": 0, "expected_goals": "0", "expected_assists": "0"}],
+ "events": [{"id": 1, "deadline_time": "2024-08-16T17:30:00Z", "finished": true, "is_next": false},
+            {"id": 2, "deadline_time": "2024-08-24T10:00:00Z", "finished": false, "is_next": true}]}
