@@ -1,15 +1,21 @@
 # Results
 
-How well can a model built only from past scorelines predict Premier League matches?
-This report covers milestone 3: two models, tuned on one season and scored on four
-seasons they never saw.
+Two questions, answered without letting any model see the future:
+
+1. **Match prediction:** how well can a model built only from past scorelines predict
+   Premier League matches?
+2. **Fantasy Premier League:** do those predictions make better FPL decisions?
 
 Reproduce everything here with:
 
 ```bash
-epl tune       # validation season 2021-22 only
-epl backtest   # test seasons 2022-23 to 2025-26
+epl tune       # match models: validation season 2021-22 only
+epl backtest   # match models: test seasons 2022-23 to 2025-26
+epl xp         # FPL expected points vs FPL's own forecast, 2024-25
+epl season     # FPL season replay, 2024-25
 ```
+
+# Part 1: match prediction
 
 ## Method
 
@@ -75,15 +81,103 @@ Paired differences in RPS (negative = first model better):
   it is the only season where away wins (40.3%) outnumbered home wins (37.9%). It sits in
   the training history, and its weight fades with the time decay.
 
-## Still to come
+# Part 2: Fantasy Premier League
+
+## Expected points per player
+
+- **Inputs from the match model:** Dixon–Coles supplies each fixture's expected goals for
+  and against and the clean-sheet probability.
+- **Inputs from each player's earlier gameweeks:**
+  - Minutes: the probability of playing, and of playing 60+.
+  - Share of the team's xG and xA while on the pitch, shrunk towards his position's
+    typical share.
+  - A per-90 residual covering bonus, saves, cards and defensive contributions.
+- **Settings:** one tuning grid on 2023-24, which only shortened the minutes window from
+  6 gameweeks to 4. 2024-25 is held out.
+
+**Two data traps, found and fixed:**
+
+- **Player ids are reused every season.** FPL renumbers players each summer: element 384
+  was a Liverpool outfielder in 2025-26 and Man City's goalkeeper in 2026-27. Joining
+  last season's rows to this season's players by id silently attached *every* one of
+  them to the wrong person (100% in both seasons checked). Rows now carry FPL's stable
+  player `code`, and history is re-keyed by code before it is combined. All numbers
+  below are after the fix.
+- **A leaky benchmark.** The community dataset records FPL's own expected points (`xP`)
+  for every player and gameweek, and at first it looked unbeatable: a Spearman
+  correlation of 0.58 with the gameweek's points among players who played. Consecutive
+  gameweeks' points correlate only 0.21, though, and the same `xP` correlates just 0.22
+  with the *next* gameweek's points. So the value on a gameweek's row was recorded
+  after that gameweek: it is FPL's forecast for the following one, built from form that
+  already includes the row's result. Shifted to the gameweek it was published for, it
+  becomes a fair benchmark.
+
+Compared on the same player-gameweeks:
+
+| Season | Forecast | MAE ↓ | Rank correlation ↑ | Rank correlation, players who played ↑ | Top 50 picks per gameweek: actual points ↑ |
+|---|---|---|---|---|---|
+| **2024-25 (test)** | **This model** | **1.012** | **0.714** | **0.366** | **4.40** |
+| | FPL's published forecast | 1.142 | 0.581 | 0.251 | 3.90 |
+| 2023-24 (validation) | This model | 0.981 | 0.711 | 0.371 | 4.67 |
+| | FPL's published forecast | 1.122 | 0.593 | 0.265 | 3.89 |
+
+FPL's forecast also knows injury and suspension news, which the historical files don't
+record. Live, the planner uses FPL's injury flags, so this model gains that
+information too.
+
+## Squad selection and transfers
+
+- **The optimiser:** an exact integer program (HiGHS through `scipy.optimize.milp`).
+  - Picks a 15-player squad (2 GK, 5 DEF, 5 MID, 3 FWD, at most 3 per club,
+    £100m), a valid XI and a captain.
+  - Plans transfers over a rolling horizon, with free transfers rolling over up to five.
+  - Property tests generate random player pools and check that every plan obeys every rule.
+- **The replay:** gameweeks 2–38 of a past season, with each week's decisions made at
+  the deadline. Real points are counted with captaincy, auto-substitutions, hits and
+  FPL selling prices. Chips are not used.
+- **Tuning on 2023-24:** planning horizon (1 or 3 gameweeks) and how much the planner
+  charges itself per hit (4, 6, 8 or 12). The best was the simplest: a 1-gameweek
+  horizon at the real 4-point cost (2,200 points). Results across the grid ranged from
+  2,091 to 2,200, so the choice matters less than the forecasts do. (With the id bug
+  still in the data, a penalty of 8 had looked best; that finding did not survive the
+  fix.)
+
+Same frozen planner for every forecast:
+
+| Season | Forecast | Season points | Transfers | Hits |
+|---|---|---|---|---|
+| **2024-25 (test)** | **This model** | **2,102** | 57 | 21 |
+| | Recent form (last 4 gameweeks) | 1,928 | 75 | 39 |
+| | FPL's published forecast | 1,744 | 90 | 54 |
+| 2023-24 (validation) | This model | 2,200 | 64 | 28 |
+| | Recent form | 1,804 | 91 | 55 |
+| | FPL's published forecast | 1,748 | 102 | 66 |
+
+Bootstrapping the 37 gameweeks of the held-out season:
+
+| 2024-25 comparison | Season-total gap | 95% interval | Gameweeks ahead |
+|---|---|---|---|
+| This model − FPL's forecast | +358 | +151 to +550 | 29 of 37 |
+| This model − recent form | +174 | −29 to +370 | 24 of 37 |
+
+**Reading it:**
+- **Against FPL's published forecast the margin is significant:** +358 points over a
+  season, ahead in 29 of 37 gameweeks.
+- **Against recent form the model is ahead but the interval just includes zero.** One
+  season of FPL points is noisy, because squads diverge and luck compounds. In the
+  validation season the gap was +396.
+- **Noisier forecasts make worse transfer decisions.** Form and FPL's forecast take two
+  to three times as many hits, chasing last week's points.
+
+# Still to come
 
 - **Market benchmark.** De-margined closing odds from football-data.co.uk are the real bar.
-  Published studies put market RPS for the Premier League a little below these models,
-  so expect the market to win. The useful question is by how much.
+  Closing prices include team news these models never see, so expect the market to win.
+  The useful question is by how much.
 - **Multi-season validation** on the longer history, replacing the single-season tuning.
 - **Stacking and recalibration** (isotonic or Platt) of the two models.
 
-## Limitations
+# Limitations
 
 - **No team news.** No lineups, injuries, suspensions or transfers. The market sees all
   of these.

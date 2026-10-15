@@ -3,6 +3,8 @@
     epl fetch    [--first 2019-20] [--last 2025-26]       download and cache results
     epl backtest [--test 2022-23 ...] [--odds]           walk-forward scores, written to reports/
     epl tune     [--validation 2021-22 ...]              grid search on validation seasons only
+    epl xp       [--season 2024-25]                     expected points vs FPL's own forecast
+    epl season   [--season 2024-25] [--horizon 1]       replay an FPL season with each forecaster
 
 Results come from the FPL community dataset (2019-20 onwards). With --odds, matches
 come from football-data.co.uk instead, which adds bookmaker odds and the market baseline.
@@ -17,6 +19,8 @@ from .data import fpl, load
 from .eval import backtest, calibration
 from .eval.significance import paired_bootstrap
 from .eval.tune import grid_search
+from .fpl import evaluate as fpl_eval
+from .fpl import season as fpl_season
 from .models.baselines import FrequencyModel, MarketModel
 from .models.dixon_coles import DixonColesModel
 from .models.elo import EloModel
@@ -94,6 +98,40 @@ def cmd_tune(args) -> None:
     print(dc.head(8)[["xi", "l2", "rps", "log_loss"]].round(4).to_string(index=False))
 
 
+def _fpl_inputs(season: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+    start = int(season[:4])
+    matches = load_results(f"{start - 2}-{(start - 1) % 100:02d}", season, odds=False)
+    return matches, fpl.history_two_seasons(season)
+
+
+def cmd_xp(args) -> None:
+    matches, player_gw = _fpl_inputs(args.season)
+    results = fpl_eval.walk_forward_xp(matches, player_gw, args.season)
+    both = results.dropna(subset=["fpl_xp"])  # identical rows for both forecasts
+    table = pd.DataFrame({"ours": fpl_eval.score_xp(both, "xp"),
+                          "fpl": fpl_eval.score_xp(both, "fpl_xp")}).T
+    REPORTS.mkdir(exist_ok=True)
+    table.to_csv(REPORTS / f"xp_{args.season}.csv")
+    print(table.round(3).to_string())
+
+
+def cmd_season(args) -> None:
+    matches, player_gw = _fpl_inputs(args.season)
+    forecasters = {
+        "model": (fpl_season.model_forecaster(), args.horizon),
+        "form": (fpl_season.form_forecaster(), 1),
+        "fpl": (fpl_season.fpl_forecaster(player_gw, args.season), 1),
+    }
+    REPORTS.mkdir(exist_ok=True)
+    for name, (forecaster, horizon) in forecasters.items():
+        result = fpl_season.simulate(matches, player_gw, args.season, forecaster, name,
+                                     horizon=horizon)
+        result.weeks.to_csv(REPORTS / f"season_{args.season}_{name}.csv", index=False)
+        w = result.weeks
+        print(f"{name:6s} total {result.total:5d}  per gameweek {w.points.mean():.1f}  "
+              f"transfers {w.transfers.sum():3d}  hits {w.hits.sum():2d}")
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="epl")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -110,6 +148,13 @@ def main(argv: list[str] | None = None) -> None:
             p.add_argument("--test", nargs="+", default=load.seasons("2022-23", "2025-26"))
         if name == "tune":
             p.add_argument("--validation", nargs="+", default=["2021-22"])
+    p = sub.add_parser("xp", help="expected points vs FPL's own forecast")
+    p.add_argument("--season", default="2024-25")
+    p.set_defaults(func=cmd_xp)
+    p = sub.add_parser("season", help="replay an FPL season with each forecaster")
+    p.add_argument("--season", default="2024-25")
+    p.add_argument("--horizon", type=int, default=1)  # best on the 2023-24 replay
+    p.set_defaults(func=cmd_season)
     args = parser.parse_args(argv)
     args.func(args)
 

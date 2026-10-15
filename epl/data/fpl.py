@@ -6,6 +6,11 @@
               scores, so they double as a results source (no odds) from 2019-20.
 
 Everything is mapped onto the same canonical team names as the match data.
+
+Player ids ("element") are reassigned every season: element 384 can be a Liverpool
+midfielder one year and a Man City goalkeeper the next. FPL's `code` is the stable
+identity, so rows carry it, and align_elements() re-keys earlier seasons' rows to the
+target season's ids before any history is combined.
 """
 
 import io
@@ -24,7 +29,7 @@ VALID_POSITIONS = frozenset(POSITIONS.values())  # drops 2024-25's "AM" (assista
 PLAYER_GW_COLUMNS = [
     "season", "gw", "element", "name", "position", "team", "opponent", "was_home", "kickoff",
     "minutes", "total_points", "goals", "assists", "clean_sheets", "goals_conceded", "saves",
-    "bonus", "xg", "xa", "price",
+    "bonus", "xg", "xa", "price", "fpl_xp", "code",
 ]
 
 
@@ -70,15 +75,48 @@ def parse_results(fixtures: pd.DataFrame, teams: pd.DataFrame, season: str) -> p
     return out[cols].sort_values(["date", "home"]).reset_index(drop=True)
 
 
+def history_codes(
+    season: str, cache_dir: Path = download.CACHE_DIR, fetch=download.get_bytes
+) -> dict[int, int]:
+    """{element id that season: stable player code}."""
+    raw = _history_csv(season, "players_raw.csv", cache_dir, fetch)
+    return dict(zip(raw["id"].astype(int), raw["code"].astype(int), strict=True))
+
+
 def history_player_gw(
     season: str, cache_dir: Path = download.CACHE_DIR, fetch=download.get_bytes
 ) -> pd.DataFrame:
     teams = _history_csv(season, "teams.csv", cache_dir, fetch)
     merged = _history_csv(season, "gws/merged_gw.csv", cache_dir, fetch)
-    return parse_player_gw(merged, teams, season)
+    return parse_player_gw(merged, teams, season, history_codes(season, cache_dir, fetch))
 
 
-def parse_player_gw(merged: pd.DataFrame, teams: pd.DataFrame, season: str) -> pd.DataFrame:
+def align_elements(rows: pd.DataFrame, codes: dict[int, int]) -> pd.DataFrame:
+    """Re-key rows from any season to the target season's element ids.
+
+    codes maps the target season's element id to the stable player code. Rows whose
+    player is not in the target season (left the league) are dropped."""
+    to_element = {code: element for element, code in codes.items()}
+    out = rows.copy()
+    out["element"] = out["code"].map(to_element)
+    out = out.dropna(subset=["element"])
+    out["element"] = out["element"].astype(int)
+    return out.reset_index(drop=True)
+
+
+def history_two_seasons(
+    season: str, cache_dir: Path = download.CACHE_DIR, fetch=download.get_bytes
+) -> pd.DataFrame:
+    """Last season's and this season's player rows, keyed by this season's ids."""
+    start = int(season[:4])
+    previous = f"{start - 1}-{start % 100:02d}"
+    rows = pd.concat([history_player_gw(previous, cache_dir, fetch),
+                      history_player_gw(season, cache_dir, fetch)], ignore_index=True)
+    return align_elements(rows, history_codes(season, cache_dir, fetch))
+
+
+def parse_player_gw(merged: pd.DataFrame, teams: pd.DataFrame, season: str,
+                    codes: dict[int, int] | None = None) -> pd.DataFrame:
     names = {int(i): canonical(n) for i, n in zip(teams["id"], teams["name"], strict=True)}
     df = merged[merged["position"].isin(VALID_POSITIONS)].copy()
 
@@ -108,7 +146,9 @@ def parse_player_gw(merged: pd.DataFrame, teams: pd.DataFrame, season: str) -> p
         "xg": num("expected_goals"),
         "xa": num("expected_assists"),
         "price": df["value"].astype(float) / 10,
+        "fpl_xp": num("xP"),  # FPL's own expected points, a benchmark for ours
     })
+    out["code"] = out["element"].map(codes or {}).astype("Int64")
     return out[PLAYER_GW_COLUMNS].sort_values(["gw", "element", "kickoff"]).reset_index(drop=True)
 
 
@@ -125,6 +165,7 @@ def parse_bootstrap(bootstrap: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
         chance = e.get("chance_of_playing_next_round")
         rows.append({
             "element": e["id"],
+            "code": e.get("code"),
             "name": e["web_name"],
             "team": teams[e["team"]],
             "position": position,
