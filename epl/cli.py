@@ -4,7 +4,7 @@
     epl backtest [--test 2022-23 ...] [--odds]           walk-forward scores, written to reports/
     epl tune     [--validation 2021-22 ...]              grid search on validation seasons only
     epl xp       [--season 2024-25]                     expected points vs FPL's own forecast
-    epl season   [--season 2024-25] [--horizon 3]       replay an FPL season with each forecaster
+    epl season   [--season 2024-25] [--horizon 1]       replay an FPL season with each forecaster
 
 Results come from the FPL community dataset (2019-20 onwards). With --odds, matches
 come from football-data.co.uk instead, which adds bookmaker odds and the market baseline.
@@ -101,10 +101,7 @@ def cmd_tune(args) -> None:
 def _fpl_inputs(season: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     start = int(season[:4])
     matches = load_results(f"{start - 2}-{(start - 1) % 100:02d}", season, odds=False)
-    previous = f"{start - 1}-{start % 100:02d}"
-    player_gw = pd.concat([fpl.history_player_gw(previous), fpl.history_player_gw(season)],
-                          ignore_index=True)
-    return matches, player_gw
+    return matches, fpl.history_two_seasons(season)
 
 
 def cmd_xp(args) -> None:
@@ -156,7 +153,7 @@ def main(argv: list[str] | None = None) -> None:
     p.set_defaults(func=cmd_xp)
     p = sub.add_parser("season", help="replay an FPL season with each forecaster")
     p.add_argument("--season", default="2024-25")
-    p.add_argument("--horizon", type=int, default=3)
+    p.add_argument("--horizon", type=int, default=1)  # best on the 2023-24 replay
     p.set_defaults(func=cmd_season)
     args = parser.parse_args(argv)
     args.func(args)
