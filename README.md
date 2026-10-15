@@ -34,17 +34,26 @@ published forecast:
 
 | Forecast | MAE ↓ | Rank correlation, players who played ↑ | Top 50 picks: actual points ↑ |
 |---|---|---|---|
-| **This model** | **1.023** | **0.351** | **4.30** |
+| **This model** | **1.012** | **0.366** | **4.40** |
 | FPL's published forecast | 1.142 | 0.251 | 3.90 |
 
-Along the way I found that the community dataset's `xP` column is recorded a gameweek
-late, which makes FPL's forecast look far better than it is. [REPORT.md](REPORT.md)
-shows the test and the fix.
+Along the way I found two data traps, documented in [REPORT.md](REPORT.md):
+- **Reused player ids:** FPL renumbers players every season, so joining seasons by id
+  mixes up different people. Rows are now keyed by FPL's stable player code.
+- **A leaky benchmark:** the community dataset's `xP` column is recorded a gameweek late,
+  which makes FPL's forecast look far better than it is.
 
-**Season replays** (same planner for every forecast):
-- The model beats recent form in both seasons.
-- Against FPL's published forecast it splits: +105 points in 2024-25, −10 in 2023-24.
-- One season of FPL points is too noisy to separate them.
+**Season replay**, 2024-25 (same planner for every forecast):
+
+| Forecast | Season points |
+|---|---|
+| **This model** | **2,102** |
+| Recent form | 1,928 |
+| FPL's published forecast | 1,744 |
+
+- **Against FPL's forecast:** +358 points, 95% interval [+151, +550].
+- **Against recent form:** +174 points, 95% interval [−29, +370], so not quite
+  significant over one season.
 
 ## Quick start
 
@@ -56,7 +65,7 @@ epl backtest            # match models, walk-forward, held-out seasons
 epl tune                # how the settings were chosen (validation season only)
 epl xp                  # FPL expected points vs FPL's own forecast
 epl season              # replay the 2024-25 FPL season with each forecast
-pytest -q               # 56 tests, including property tests for the optimiser
+pytest -q               # 58 tests, including property tests for the optimiser
 ```
 
 Data downloads on first use and is cached in `data/cache/`.
