@@ -19,3 +19,5 @@ jobs:
         run: ruff check .
       - name: Unit and property tests
         run: pytest -q
+      - name: Backtest smoke test (one season, real data)
+        run: epl backtest --first 2019-20 --last 2022-23 --test 2022-23

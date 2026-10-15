@@ -159,3 +159,28 @@ def test_summaries_and_comparison_tables():
     assert (table["matches"] == 30).all()
     overall = backtest.summarise(preds["market"], by=None)
     assert len(overall) == 1
+
+
+# ---------- paired bootstrap ----------
+
+
+def _preds(probs, results, dates):
+    return pd.DataFrame({"match_id": [f"m{i}" for i in range(len(results))], "date": dates,
+                         "result": results, "p_H": probs[:, 0], "p_D": probs[:, 1],
+                         "p_A": probs[:, 2]})
+
+
+def test_paired_bootstrap_detects_a_real_gap_and_not_a_fake_one():
+    from epl.eval.significance import paired_bootstrap
+
+    rng = np.random.default_rng(4)
+    n = 3000
+    truth = rng.dirichlet([4, 2, 3], size=n)
+    results = [metrics.OUTCOMES[rng.choice(3, p=row)] for row in truth]
+    dates = pd.Timestamp("2022-08-06") + pd.to_timedelta(rng.integers(0, 280, n), unit="D")
+    good = _preds(truth, results, dates)
+    flat = _preds(np.full((n, 3), 1 / 3), results, dates)
+    gap = paired_bootstrap(good, flat)
+    assert gap["ci_high"] < 0  # the true probabilities clearly beat uniform guessing
+    same = paired_bootstrap(good, good.copy())
+    assert same["mean_diff"] == 0 and same["ci_low"] <= 0 <= same["ci_high"]
