@@ -188,7 +188,8 @@ def parse_live_fixtures(fixtures: list[dict], bootstrap: dict) -> pd.DataFrame:
     """fixtures/ -> one row per scheduled match (finished or not)."""
     teams = {t["id"]: canonical(t["name"]) for t in bootstrap["teams"]}
     return pd.DataFrame([
-        {"gw": f["event"], "kickoff": pd.Timestamp(f["kickoff_time"]).tz_localize(None),
+        {"fixture_id": f["id"], "gw": f["event"],
+         "kickoff": pd.Timestamp(f["kickoff_time"]).tz_localize(None),
          "home": teams[f["team_h"]], "away": teams[f["team_a"]], "finished": bool(f["finished"]),
          "hg": f.get("team_h_score"), "ag": f.get("team_a_score")}
         for f in fixtures

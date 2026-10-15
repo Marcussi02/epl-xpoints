@@ -41,9 +41,9 @@ def tau(x, y, lam, mu, rho):
 class DixonColesModel:
     name = "dixon_coles"
 
-    # Defaults chosen by grid search on the 2021-22 validation season (see REPORT.md):
-    # a ~3-year half-life and light shrinkage beat the paper's xi=0.0019 with no ridge.
-    def __init__(self, xi: float = 0.0006, l2: float = 2.0, max_goals: int = MAX_GOALS):
+    # Defaults chosen by grid search on six validation seasons, 2016-17 to 2021-22 (see
+    # REPORT.md): the paper's xi=0.0019 (a ~1-year half-life) plus light ridge shrinkage.
+    def __init__(self, xi: float = 0.0019, l2: float = 2.0, max_goals: int = MAX_GOALS):
         self.xi, self.l2, self.max_goals = xi, l2, max_goals
 
     # ---------- fitting ----------

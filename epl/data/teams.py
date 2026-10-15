@@ -30,6 +30,7 @@ ALIASES: dict[str, str] = {
     "West Ham United": "West Ham",
     "Wolverhampton Wanderers": "Wolves",
     "Cardiff City": "Cardiff",
+    "Coventry City": "Coventry",
     "Huddersfield Town": "Huddersfield",
     "Swansea City": "Swansea",
     "Stoke City": "Stoke",

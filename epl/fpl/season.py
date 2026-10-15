@@ -26,7 +26,6 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-from ..models.dixon_coles import DixonColesModel
 from . import optimise, xpoints
 from .evaluate import benchmark_forecasts
 
@@ -60,7 +59,7 @@ class Context:
 
 def model_forecaster(config: xpoints.XPConfig = xpoints.CONFIG) -> Forecaster:
     def forecast(ctx: Context, gws: list[int]) -> pd.DataFrame:
-        dc = DixonColesModel().fit(ctx.past_matches())
+        dc = config.match_model().fit(ctx.past_matches())
         rates = xpoints.team_fixture_rates(dc, ctx.fixtures(gws))
         prof = xpoints.player_profiles(ctx.past_player_rows(), config=config)
         prof = prof.loc[prof.index.intersection(ctx.universe.index)].copy()
