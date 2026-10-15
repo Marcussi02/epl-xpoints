@@ -53,6 +53,14 @@ class XPConfig:
     residual_strength: float = 4.0
     minutes_window: int = 4  # 4 beat 6 and 10 on the 2023-24 validation season
     share_window: int = 20
+    # The match model as the FPL settings were tuned with. The six-season match tuning
+    # prefers xi=0.0019, but on the FPL validation season (2023-24) that replays 139
+    # points worse, so the FPL pipeline keeps its own (see REPORT.md).
+    dc_xi: float = 0.0006
+    dc_l2: float = 2.0
+
+    def match_model(self) -> DixonColesModel:
+        return DixonColesModel(xi=self.dc_xi, l2=self.dc_l2)
 
 
 CONFIG = XPConfig()

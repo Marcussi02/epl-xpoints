@@ -1,13 +1,15 @@
 """Command line entry point.
 
-    epl fetch    [--first 2019-20] [--last 2025-26]       download and cache results
-    epl backtest [--test 2022-23 ...] [--odds]           walk-forward scores, written to reports/
-    epl tune     [--validation 2021-22 ...]              grid search on validation seasons only
+    epl fetch    [--first 2000-01] [--last 2025-26]       download and cache results
+    epl backtest [--test 2022-23 ...] [--no-odds]        walk-forward scores, written to reports/
+    epl tune     [--validation 2016-17 ...]              grid search on validation seasons only
     epl xp       [--season 2024-25]                     expected points vs FPL's own forecast
     epl season   [--season 2024-25] [--horizon 1]       replay an FPL season with each forecaster
+    epl site     [--out site/index.html]                this gameweek's predictions and picks
 
-Results come from the FPL community dataset (2019-20 onwards). With --odds, matches
-come from football-data.co.uk instead, which adds bookmaker odds and the market baseline.
+Match results and bookmaker odds come from football-data.co.uk (2000-01 onwards), which
+adds the market baseline. With --no-odds they come from the FPL community dataset instead
+(2019-20 onwards, no odds).
 """
 
 import argparse
@@ -21,6 +23,7 @@ from .eval.significance import paired_bootstrap
 from .eval.tune import grid_search
 from .fpl import evaluate as fpl_eval
 from .fpl import season as fpl_season
+from .fpl import xpoints
 from .models.baselines import FrequencyModel, MarketModel
 from .models.dixon_coles import DixonColesModel
 from .models.elo import EloModel
@@ -88,11 +91,11 @@ def cmd_tune(args) -> None:
     matches = load_results(args.first, args.last, args.odds)
     pd.set_option("display.width", 160)
     elo = grid_search(matches, EloModel,
-                      {"k": [6, 8, 10, 12, 15, 20, 30], "regress": [0.0, 0.05, 0.1, 0.25]},
+                      {"k": [10, 15, 20, 25, 30], "regress": [0.0, 0.1, 0.2, 0.33]},
                       args.validation)
     print("Elo")
     print(elo.head(8)[["k", "regress", "rps", "log_loss"]].round(4).to_string(index=False))
-    dc_grid = {"xi": [0.0003, 0.0006, 0.001, 0.0019, 0.003], "l2": [0.0, 1.0, 2.0, 5.0, 10.0]}
+    dc_grid = {"xi": [0.0006, 0.001, 0.0019, 0.003], "l2": [0.0, 1.0, 2.0, 5.0]}
     dc = grid_search(matches, DixonColesModel, dc_grid, args.validation, DC_TRAIN_SEASONS)
     print("Dixon-Coles")
     print(dc.head(8)[["xi", "l2", "rps", "log_loss"]].round(4).to_string(index=False))
@@ -132,6 +135,38 @@ def cmd_season(args) -> None:
               f"transfers {w.transfers.sum():3d}  hits {w.hits.sum():2d}")
 
 
+def cmd_site(args) -> None:
+    from . import live
+    from .report import build
+
+    snap = live.snapshot()
+    model = live.fit_model(snap)
+    gws = list(range(snap.next_gw, snap.next_gw + args.horizon))
+    xp = live.expected_points(snap, live.fit_model(snap, model=xpoints.CONFIG.match_model()),
+                              gws)
+    plan = live.best_squad(snap, xp)
+    players = snap.players.set_index("element")
+
+    record = reliability = None
+    seasons_label = ""
+    if not args.no_record:
+        test = load.seasons(args.record_first, args.record_last)
+        matches = load_results("2000-01", args.record_last, odds=True)  # as in REPORT.md
+        results = run_backtest(matches, test, odds=True)
+        record = backtest.compare(results, by=None)
+        dc = results["dixon_coles"]
+        reliability = calibration.reliability(dc[["p_H", "p_D", "p_A"]].to_numpy(),
+                                              dc["result"])
+        reliability = reliability[reliability["n"] >= 20]
+        seasons_label = f"{test[0]} to {test[-1]}"
+
+    page = build.render(snap.next_gw, snap.season, snap.deadline,
+                        live.match_predictions(snap, model, snap.next_gw), players,
+                        xp[snap.next_gw], plan, record, reliability, seasons_label)
+    path = build.write(Path(args.out), page)
+    print(f"gameweek {snap.next_gw}: {path}")
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="epl")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -139,15 +174,16 @@ def main(argv: list[str] | None = None) -> None:
                                   ("backtest", cmd_backtest, "walk-forward backtest"),
                                   ("tune", cmd_tune, "tune on validation seasons")):
         p = sub.add_parser(name, help=help_text)
-        p.add_argument("--first", default="2019-20")
+        p.add_argument("--first", default="2000-01")
         p.add_argument("--last", default="2025-26")
-        p.add_argument("--odds", action="store_true",
-                       help="use football-data.co.uk (adds odds and the market baseline)")
+        p.add_argument("--odds", action=argparse.BooleanOptionalAction, default=True,
+                       help="football-data.co.uk with odds and the market baseline (default);"
+                            " --no-odds uses the FPL community dataset, 2019-20 onwards")
         p.set_defaults(func=func)
         if name == "backtest":
             p.add_argument("--test", nargs="+", default=load.seasons("2022-23", "2025-26"))
         if name == "tune":
-            p.add_argument("--validation", nargs="+", default=["2021-22"])
+            p.add_argument("--validation", nargs="+", default=load.seasons("2016-17", "2021-22"))
     p = sub.add_parser("xp", help="expected points vs FPL's own forecast")
     p.add_argument("--season", default="2024-25")
     p.set_defaults(func=cmd_xp)
@@ -155,6 +191,13 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--season", default="2024-25")
     p.add_argument("--horizon", type=int, default=1)  # best on the 2023-24 replay
     p.set_defaults(func=cmd_season)
+    p = sub.add_parser("site", help="this gameweek's predictions and picks as a static page")
+    p.add_argument("--out", default="site/index.html")
+    p.add_argument("--horizon", type=int, default=1)
+    p.add_argument("--record-first", default="2022-23")
+    p.add_argument("--record-last", default="2025-26")
+    p.add_argument("--no-record", action="store_true", help="skip the backtest track record")
+    p.set_defaults(func=cmd_site)
     args = parser.parse_args(argv)
     args.func(args)
 

@@ -29,8 +29,9 @@ def margin_multiplier(goal_diff: int) -> float:
 class EloModel:
     name = "elo"
 
-    # Defaults chosen by grid search on the 2021-22 validation season (see REPORT.md).
-    def __init__(self, k: float = 10.0, home_adv: float = 60.0, regress: float = 0.0,
+    # Defaults chosen by grid search on six validation seasons, 2016-17 to 2021-22 (see
+    # REPORT.md).
+    def __init__(self, k: float = 10.0, home_adv: float = 60.0, regress: float = 0.1,
                  initial: float = 1500.0, burn_in: int = 380):
         self.k, self.home_adv, self.regress = k, home_adv, regress
         self.initial, self.burn_in = initial, burn_in

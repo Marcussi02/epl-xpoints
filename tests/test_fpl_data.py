@@ -44,12 +44,14 @@ def test_bootstrap_parsing():
 def test_live_fixtures_skip_unscheduled():
     boot = json.loads((FIXTURES / "fpl_bootstrap.json").read_text())
     fixtures = [
-        {"event": 2, "kickoff_time": "2024-08-24T14:00:00Z", "team_h": 1, "team_a": 14,
-         "finished": False, "team_h_score": None, "team_a_score": None},
-        {"event": None, "kickoff_time": None, "team_h": 14, "team_a": 1, "finished": False},
+        {"id": 11, "event": 2, "kickoff_time": "2024-08-24T14:00:00Z", "team_h": 1,
+         "team_a": 14, "finished": False, "team_h_score": None, "team_a_score": None},
+        {"id": 12, "event": None, "kickoff_time": None, "team_h": 14, "team_a": 1,
+         "finished": False},
     ]
     f = fpl.parse_live_fixtures(fixtures, boot)
-    assert f[["gw", "home", "away"]].values.tolist() == [[2, "Arsenal", "Man United"]]
+    assert f[["fixture_id", "gw", "home", "away"]].values.tolist() == [
+        [11, 2, "Arsenal", "Man United"]]
 
 
 def test_rows_carry_stable_player_codes():

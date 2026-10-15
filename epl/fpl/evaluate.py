@@ -19,7 +19,6 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 
-from ..models.dixon_coles import DixonColesModel
 from . import xpoints
 
 
@@ -37,7 +36,7 @@ def walk_forward_xp(matches: pd.DataFrame, player_gw: pd.DataFrame, season: str,
         fixtures = current[current["gw"] == gw]
         start = fixtures["date"].min()
         train = matches[(matches["date"] < start) & (matches["season"] >= first_train)]
-        model = DixonColesModel().fit(train)
+        model = config.match_model().fit(train)
         rates = xpoints.team_fixture_rates(model, fixtures)
         profiles = xpoints.player_profiles(player_gw[player_gw["kickoff"] < start],
                                            config=config)

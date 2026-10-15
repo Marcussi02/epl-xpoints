@@ -17,16 +17,20 @@ Premier League optimiser.
 
 All results are on held-out seasons that no setting was tuned on. Full method and caveats are in **[REPORT.md](REPORT.md)**.
 
-**Match prediction** (2022-23 to 2025-26, 1,520 matches):
+**Match prediction** (2022-23 to 2025-26, 1,520 matches; settings chosen on 2016-17 to 2021-22):
 
 | Model | RPS ↓ | Log loss ↓ | Accuracy |
 |---|---|---|---|
-| Historical frequencies (no skill) | 0.2318 | 1.069 | 44.5% |
-| Elo + ordered logit | 0.2057 | 0.995 | 52.1% |
-| **Dixon–Coles** | **0.2045** | **0.990** | 52.0% |
+| Historical frequencies (no skill) | 0.2316 | 1.068 | 44.5% |
+| Elo + ordered logit | 0.2039 | 0.988 | 52.4% |
+| **Dixon–Coles** | **0.2030** | **0.986** | 52.6% |
+| Bookmaker closing odds | 0.1947 | 0.960 | 55.1% |
 
-- **Both models clearly beat no skill.** Elo vs frequency: −0.026 RPS, 95% interval
-  [−0.034, −0.019].
+- **Both models clearly beat no skill.** Dixon–Coles vs frequency: −0.029 RPS, 95%
+  interval [−0.035, −0.022].
+- **From scorelines alone, Dixon–Coles closes 78% of the gap to the closing odds** and
+  is as well calibrated. The market's remaining edge (+0.008 RPS, [+0.005, +0.011]) is
+  what team news and lineups are worth.
 - **Dixon–Coles and Elo are statistically tied.**
 
 **FPL expected points** (2024-25, 25,159 player-gameweeks), compared with FPL's own
@@ -62,10 +66,11 @@ python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
 epl backtest            # match models, walk-forward, held-out seasons
-epl tune                # how the settings were chosen (validation season only)
+epl tune                # how the settings were chosen (validation seasons only)
 epl xp                  # FPL expected points vs FPL's own forecast
 epl season              # replay the 2024-25 FPL season with each forecast
-pytest -q               # 58 tests, including property tests for the optimiser
+epl site                # this gameweek's predictions and picks, as site/index.html
+pytest -q               # 65 tests, including property tests for the optimiser
 ```
 
 Data downloads on first use and is cached in `data/cache/`.
@@ -78,6 +83,8 @@ epl/
   eval/     scoring rules, calibration, walk-forward backtest, tuning, paired bootstrap
   models/   frequency and market baselines, Elo, Dixon–Coles
   fpl/      expected points, integer-programming planner, season replay
+  report/   the static page: one self-contained HTML file, inline SVG, light and dark
+  live.py   this season from the FPL API, with injury flags, for the upcoming gameweek
   cli.py    the epl command
 ```
 
@@ -95,11 +102,11 @@ epl/
 
 ## Data and credits
 
-- **Match results and FPL player history:** the
+- **Match results and bookmaker odds, 2000-01 onwards:**
+  [football-data.co.uk](https://www.football-data.co.uk), free for non-commercial use.
+- **FPL player history:** the
   [vaastav/Fantasy-Premier-League](https://github.com/vaastav/Fantasy-Premier-League)
   dataset (MIT licence).
-- **Bookmaker odds and older results:** [football-data.co.uk](https://www.football-data.co.uk),
-  free for non-commercial use. This adds the market benchmark.
 - **Live players, prices and fixtures:** the official FPL API. It is public but
   unofficial, so requests are cached and rate-limited.
 
@@ -111,8 +118,8 @@ This is an independent project, not affiliated with the Premier League or FPL.
 - [x] Evaluation harness
 - [x] Elo and Dixon–Coles models
 - [x] FPL expected points, optimiser and season replays
-- [ ] Market benchmark from bookmaker odds, and multi-season validation on the longer history
-- [ ] Weekly live predictions and FPL picks, published as a static site
+- [x] Market benchmark from bookmaker closing odds, and six-season validation on 26 seasons of history
+- [x] Live predictions and FPL picks as a static page, rebuilt daily by GitHub Actions
 
 ## Licence
 

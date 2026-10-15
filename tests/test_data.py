@@ -77,7 +77,7 @@ def test_cache_downloads_once(tmp_path, sample_2425):
     for _ in range(2):
         raw = download.football_data_csv("2024-25", tmp_path, fetch=fake_fetch)
     assert raw == sample_2425
-    assert calls == ["https://www.football-data.co.uk/mmz4281/2425/E0.csv"]
+    assert calls == ["https://football-data.co.uk/mmz4281/2425/E0.csv"]
     assert not list(tmp_path.rglob("*.part"))
 
 
@@ -95,3 +95,11 @@ def test_validate_accepts_rows_without_odds(sample_2425):
     m = load.parse_football_data(sample_2425, "2024-25")
     m[["odds_h", "odds_d", "odds_a"]] = float("nan")
     load.validate(m)
+
+
+def test_rows_with_extra_trailing_fields_are_kept():
+    from conftest import FIXTURES
+
+    m = load.parse_football_data((FIXTURES / "E0_0304_ragged.csv").read_bytes(), "2003-04")
+    assert len(m) == 3  # pandas' on_bad_lines="skip" silently dropped two of these
+    assert m.set_index("home").loc["Chelsea", "odds_a"] == 3.0
