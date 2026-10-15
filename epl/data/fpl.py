@@ -24,7 +24,7 @@ VALID_POSITIONS = frozenset(POSITIONS.values())  # drops 2024-25's "AM" (assista
 PLAYER_GW_COLUMNS = [
     "season", "gw", "element", "name", "position", "team", "opponent", "was_home", "kickoff",
     "minutes", "total_points", "goals", "assists", "clean_sheets", "goals_conceded", "saves",
-    "bonus", "xg", "xa", "price",
+    "bonus", "xg", "xa", "price", "fpl_xp",
 ]
 
 
@@ -108,6 +108,7 @@ def parse_player_gw(merged: pd.DataFrame, teams: pd.DataFrame, season: str) -> p
         "xg": num("expected_goals"),
         "xa": num("expected_assists"),
         "price": df["value"].astype(float) / 10,
+        "fpl_xp": num("xP"),  # FPL's own expected points, a benchmark for ours
     })
     return out[PLAYER_GW_COLUMNS].sort_values(["gw", "element", "kickoff"]).reset_index(drop=True)
 
