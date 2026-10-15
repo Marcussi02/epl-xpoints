@@ -95,26 +95,35 @@ Paired differences in RPS (negative = first model better):
 - **Settings:** one tuning grid on 2023-24, which only shortened the minutes window from
   6 gameweeks to 4. 2024-25 is held out.
 
-**A leaky benchmark, caught.** The community dataset records FPL's own expected
-points (`xP`) for every player and gameweek, and at first it looked unbeatable: a
-Spearman correlation of 0.58 with the gameweek's points among players who played.
-Consecutive gameweeks' points correlate only 0.21, though, and the same `xP` correlates
-just 0.22 with the *next* gameweek's points. So the value on a gameweek's row was
-recorded after that gameweek: it is FPL's forecast for the following one, built from
-form that already includes the row's result. Shifted to the gameweek it was published
-for, it becomes a fair benchmark.
+**Two data traps, found and fixed:**
 
-Held-out 2024-25, compared on the same 25,159 player-gameweeks:
+- **Player ids are reused every season.** FPL renumbers players each summer: element 384
+  was a Liverpool outfielder in 2025-26 and Man City's goalkeeper in 2026-27. Joining
+  last season's rows to this season's players by id silently attached *every* one of
+  them to the wrong person (100% in both seasons checked). Rows now carry FPL's stable
+  player `code`, and history is re-keyed by code before it is combined. All numbers
+  below are after the fix.
+- **A leaky benchmark.** The community dataset records FPL's own expected points (`xP`)
+  for every player and gameweek, and at first it looked unbeatable: a Spearman
+  correlation of 0.58 with the gameweek's points among players who played. Consecutive
+  gameweeks' points correlate only 0.21, though, and the same `xP` correlates just 0.22
+  with the *next* gameweek's points. So the value on a gameweek's row was recorded
+  after that gameweek: it is FPL's forecast for the following one, built from form that
+  already includes the row's result. Shifted to the gameweek it was published for, it
+  becomes a fair benchmark.
 
-| Forecast | MAE ↓ | Rank correlation ↑ | Rank correlation, players who played ↑ | Top 50 picks per gameweek: actual points ↑ | Bias |
+Compared on the same player-gameweeks:
+
+| Season | Forecast | MAE ↓ | Rank correlation ↑ | Rank correlation, players who played ↑ | Top 50 picks per gameweek: actual points ↑ |
 |---|---|---|---|---|---|
-| **This model** | **1.023** | **0.704** | **0.351** | **4.30** | +0.04 |
-| FPL's published forecast | 1.142 | 0.581 | 0.251 | 3.90 | −0.14 |
+| **2024-25 (test)** | **This model** | **1.012** | **0.714** | **0.366** | **4.40** |
+| | FPL's published forecast | 1.142 | 0.581 | 0.251 | 3.90 |
+| 2023-24 (validation) | This model | 0.981 | 0.711 | 0.371 | 4.67 |
+| | FPL's published forecast | 1.122 | 0.593 | 0.265 | 3.89 |
 
-The validation season tells the same story (rank correlation among players who played:
-0.342 vs 0.265). FPL's forecast also knows injury and suspension news, which the
-historical files don't record. Live, the planner uses FPL's injury flags, so this
-model gains that information too.
+FPL's forecast also knows injury and suspension news, which the historical files don't
+record. Live, the planner uses FPL's injury flags, so this model gains that
+information too.
 
 ## Squad selection and transfers
 
@@ -126,38 +135,39 @@ model gains that information too.
 - **The replay:** gameweeks 2–38 of a past season, with each week's decisions made at
   the deadline. Real points are counted with captaincy, auto-substitutions, hits and
   FPL selling prices. Chips are not used.
-- **Tuning on 2023-24:** charging the planner 8 points per hit instead of the real 4
-  cut hits from 37 to 15 and raised the season total. The 3- and 1-gameweek horizons
-  tied, so the 3-gameweek horizon stays.
+- **Tuning on 2023-24:** planning horizon (1 or 3 gameweeks) and how much the planner
+  charges itself per hit (4, 6, 8 or 12). The best was the simplest: a 1-gameweek
+  horizon at the real 4-point cost (2,200 points). Results across the grid ranged from
+  2,091 to 2,200, so the choice matters less than the forecasts do. (With the id bug
+  still in the data, a penalty of 8 had looked best; that finding did not survive the
+  fix.)
 
-Held-out 2024-25, same frozen planner for every forecast:
+Same frozen planner for every forecast:
 
-| Forecast | Season points | Per gameweek | Transfers | Hits |
+| Season | Forecast | Season points | Transfers | Hits |
 |---|---|---|---|---|
-| **This model** (3-gameweek horizon) | **2,071** | **56.0** | 44 | 8 |
-| Recent form (last 4 gameweeks) | 2,003 | 54.1 | 43 | 7 |
-| FPL's published forecast | 1,966 | 53.1 | 43 | 7 |
+| **2024-25 (test)** | **This model** | **2,102** | 57 | 21 |
+| | Recent form (last 4 gameweeks) | 1,928 | 75 | 39 |
+| | FPL's published forecast | 1,744 | 90 | 54 |
+| 2023-24 (validation) | This model | 2,200 | 64 | 28 |
+| | Recent form | 1,804 | 91 | 55 |
+| | FPL's published forecast | 1,748 | 102 | 66 |
 
-The same frozen planner on 2023-24, the season the hit penalty was tuned on:
+Bootstrapping the 37 gameweeks of the held-out season:
 
-| Forecast | Season points | Hits |
-|---|---|---|
-| This model | 2,002 | 15 |
-| Recent form | 1,884 | 9 |
-| FPL's published forecast | **2,012** | 16 |
+| 2024-25 comparison | Season-total gap | 95% interval | Gameweeks ahead |
+|---|---|---|---|
+| This model − FPL's forecast | +358 | +151 to +550 | 29 of 37 |
+| This model − recent form | +174 | −29 to +370 | 24 of 37 |
 
-**Honest reading:**
-- The model beats recent form in both seasons (+68 and +118 points).
-- Against FPL's published forecast it splits: +105 in 2024-25, −10 in 2023-24.
-- Neither 2024-25 gap is significant. Bootstrapping the 37 gameweeks gives 95% intervals
-  on the season-total gap of −131 to +257 points against form and −93 to +317 against
-  FPL. FPL points are noisy and squads diverge, so luck compounds. Season replays can't
-  separate these forecasts.
-- The player-level comparison above, across 25,000 forecasts, is where the model's edge
-  is clear.
-- The hit penalty mattered more to the baselines than to this model. Before tuning, on
-  the same 2024-25 replay, the model scored 2,104, form 1,904 and FPL's forecast 1,744.
-  Noisier forecasts make worse transfer decisions, and the penalty partly protects them.
+**Reading it:**
+- **Against FPL's published forecast the margin is significant:** +358 points over a
+  season, ahead in 29 of 37 gameweeks.
+- **Against recent form the model is ahead but the interval just includes zero.** One
+  season of FPL points is noisy, because squads diverge and luck compounds. In the
+  validation season the gap was +396.
+- **Noisier forecasts make worse transfer decisions.** Form and FPL's forecast take two
+  to three times as many hits, chasing last week's points.
 
 # Still to come
 
