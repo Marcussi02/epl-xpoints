@@ -16,7 +16,7 @@ from pathlib import Path
 
 USER_AGENT = "epl-xpoints/0.1 (+https://github.com/Marcussi02/epl-xpoints)"
 CACHE_DIR = Path("data/cache")
-FOOTBALL_DATA_URL = "https://www.football-data.co.uk/mmz4281/{code}/E0.csv"
+FOOTBALL_DATA_URL = "https://football-data.co.uk/mmz4281/{code}/E0.csv"  # www. redirects here
 FPL_API = "https://fantasy.premierleague.com/api/"
 MIN_INTERVAL_S = 1.0
 

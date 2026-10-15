@@ -13,6 +13,7 @@ Only the columns in PREMATCH_COLUMNS are known before kick-off. The backtest han
 models nothing else, so no model can peek at a result it is asked to predict.
 """
 
+import csv
 import io
 from pathlib import Path
 
@@ -40,7 +41,16 @@ ODDS_PRIORITY = [
 def parse_football_data(raw: bytes, season: str) -> pd.DataFrame:
     """Parse one football-data.co.uk E0.csv into the tidy match schema."""
     text = raw.decode("utf-8-sig", errors="replace")
-    df = pd.read_csv(io.StringIO(text), on_bad_lines="skip")
+    # Some seasons have rows with more fields than the header (stray trailing columns).
+    # Trim every row to the header instead of skipping it, or whole matches go missing.
+    rows = [r for r in csv.reader(io.StringIO(text)) if any(cell.strip() for cell in r)]
+    if not rows:
+        return _empty()
+    header = rows[0]
+    body = [(r + [""] * len(header))[: len(header)] for r in rows[1:]]
+    df = pd.DataFrame(body, columns=header).replace("", np.nan)
+    for col in ("FTHG", "FTAG"):
+        df[col] = pd.to_numeric(df[col], errors="coerce")
     df = df.dropna(subset=["HomeTeam", "AwayTeam", "FTHG", "FTAG"])  # trailing blank rows
     if df.empty:
         return _empty()
