@@ -138,14 +138,23 @@ Held-out 2024-25, same frozen planner for every forecast:
 | Recent form (last 4 gameweeks) | 2,003 | 54.1 | 43 | 7 |
 | FPL's published forecast | 1,966 | 53.1 | 43 | 7 |
 
+The same frozen planner on 2023-24, the season the hit penalty was tuned on:
+
+| Forecast | Season points | Hits |
+|---|---|---|
+| This model | 2,002 | 15 |
+| Recent form | 1,884 | 9 |
+| FPL's published forecast | **2,012** | 16 |
+
 **Honest reading:**
-- The model finishes ahead in both seasons replayed. In 2023-24 (validation) it scored
-  2,002 against 1,823 for form and 1,748 for FPL's forecast, with an untuned planner
-  for the baselines.
-- One season is not enough to call it, though. Bootstrapping the 37 gameweeks gives
-  95% intervals on the season-total gap of −131 to +257 points against form and −93 to
-  +317 against FPL. FPL points are noisy and squads diverge, so luck compounds.
-- The player-level comparison above, across 25,000 forecasts, is the stronger evidence.
+- The model beats recent form in both seasons (+68 and +118 points).
+- Against FPL's published forecast it splits: +105 in 2024-25, −10 in 2023-24.
+- Neither 2024-25 gap is significant. Bootstrapping the 37 gameweeks gives 95% intervals
+  on the season-total gap of −131 to +257 points against form and −93 to +317 against
+  FPL. FPL points are noisy and squads diverge, so luck compounds. Season replays can't
+  separate these forecasts.
+- The player-level comparison above, across 25,000 forecasts, is where the model's edge
+  is clear.
 - The hit penalty mattered more to the baselines than to this model. Before tuning, on
   the same 2024-25 replay, the model scored 2,104, form 1,904 and FPL's forecast 1,744.
   Noisier forecasts make worse transfer decisions, and the penalty partly protects them.
